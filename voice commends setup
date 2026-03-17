@@ -1,0 +1,56 @@
+import sounddevice as sd
+import numpy as np
+from transformers import pipeline
+from dronekit import connect, VehicleMode
+import time
+
+print("Loading HuggingFace speech model...")
+
+asr = pipeline("automatic-speech-recognition",
+               model="openai/whisper-small")
+
+print("Connecting to drone...")
+vehicle = connect('127.0.0.1:14550', wait_ready=True)
+
+def record_audio(seconds=3, samplerate=16000):
+    print("Speak now...")
+    audio = sd.rec(int(seconds * samplerate),
+                   samplerate=samplerate,
+                   channels=1,
+                   dtype='float32')
+    sd.wait()
+    return audio.flatten()
+
+def takeoff():
+    print("Drone taking off")
+
+    vehicle.mode = VehicleMode("GUIDED")
+    vehicle.armed = True
+
+    while not vehicle.armed:
+        time.sleep(1)
+
+    vehicle.simple_takeoff(5)
+
+def land():
+    print("Drone landing")
+    vehicle.mode = VehicleMode("LAND")
+
+print("Voice control ready")
+
+while True:
+
+    audio = record_audio()
+
+    text = asr(audio)["text"].lower()
+
+    print("You said:", text)
+
+    if "take off" in text or "takeoff" in text:
+        takeoff()
+
+    elif "land" in text:
+        land()
+
+    elif "exit" in text:
+        break
